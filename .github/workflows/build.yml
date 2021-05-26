@@ -3,22 +3,6 @@ name: continuous-integration/gh-actions/cli
 on: [push, pull_request]
 
 jobs:
-  build-macos:
-    runs-on: macOS-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: recursive
-    - name: install dependencies
-      run: HOMEBREW_NO_AUTO_UPDATE=1 brew install autoconf autogen automake binutils coreutils libsodium openssl pkg-config boost hidapi ldns expat libunwind-headers readline
-    - name: build
-      run: make release
-    - name: Upload mac artifacts
-      uses: actions/upload-artifact@master
-      with:
-        name: macos
-        path: 'build/**/**/evolution*'
-
   build-windows:
     runs-on: windows-latest
     defaults:
@@ -28,7 +12,7 @@ jobs:
     - uses: actions/checkout@v1
       with:
         submodules: recursive
-    - uses: eine/setup-msys2@v2
+    - uses: eine/setup-msys2@v1
       with:
         update: true
         install: mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake mingw-w64-x86_64-boost mingw-w64-x86_64-openssl mingw-w64-x86_64-libsodium mingw-w64-x86_64-hidapi mingw-w64-x86_64-libusb mingw-w64-x86_64-libtool git automake autoconf patch
@@ -48,61 +32,28 @@ jobs:
         submodules: recursive
     - name: remove bundled boost
       run: sudo rm -rf /usr/local/share/boost
-    - name: set apt conf
-      run: |
-        echo "Acquire::Retries \"3\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-        echo "Acquire::http::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-        echo "Acquire::ftp::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
     - name: update apt
       run: sudo apt update
     - name: install Evolution dependencies
-      run: sudo apt -y install build-essential cmake libboost-all-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev gperf libreadline-dev
+      run: sudo apt -y install build-essential cmake libboost-all-dev miniupnpc libunbound-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libzmq3-dev libsodium-dev libhidapi-dev libnorm-dev libusb-1.0-0-dev libpgm-dev
     - name: build
-      run: make release -j2
+      run: make release -j3
     - name: Upload linux artifacts
       uses: actions/upload-artifact@master
       with:
         name: linux
         path: 'build/**/**/evolution*'
-
-  build-ubuntu-depends:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: recursive
-    - name: set apt conf
-      run: |
-        echo "Acquire::Retries \"3\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-        echo "Acquire::http::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-        echo "Acquire::ftp::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-    - name: update apt
-      run: sudo apt update
-    - name: install Evolution dependencies
-      run: sudo apt -y install build-essential cmake libboost-all-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev gperf libreadline-dev
-    - name: build
-      run: make depends target=x86_64-linux-gnu -j2
-    - name: Upload linux artifacts
-      uses: actions/upload-artifact@master
-      with:
-        name: linux-static
-        path: 'build/x86_64-linux-gnu/release/bin/evolution*'
-
+  
   build-dpends-compat:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: recursive
-    - name: set apt conf
-      run: |
-        echo "Acquire::Retries \"3\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-        echo "Acquire::http::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
-        echo "Acquire::ftp::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
     - name: update apt
       run: sudo apt update
     - name: install Evolution dependencies
-      run: sudo apt -y install build-essential cmake libboost-all-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev gperf libreadline-dev
+      run: sudo apt -y install build-essential cmake libboost-all-dev miniupnpc libunbound-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libzmq3-dev libsodium-dev libhidapi-dev libnorm-dev libusb-1.0-0-dev libpgm-dev gperf libreadline-dev
     - name: build
       run: make depends-compat target=x86_64-linux-gnu -j2
     - name: Upload linux artifacts
@@ -110,3 +61,21 @@ jobs:
       with:
         name: linux-compat
         path: 'build/x86_64-linux-gnu-compat/release/bin/evolution*'
+
+  test-ubuntu:
+    needs: build-ubuntu
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - name: remove bundled boost
+      run: sudo rm -rf /usr/local/share/boost
+    - name: update apt
+      run: sudo apt update
+    - name: install Evolution dependencies
+      run: sudo apt -y install build-essential cmake libboost-all-dev miniupnpc libunbound-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libzmq3-dev libsodium-dev libhidapi-dev libnorm-dev libusb-1.0-0-dev libpgm-dev
+    - name: install requests
+      run: pip install requests
+    - name: tests
+      run: make release-test -j3
